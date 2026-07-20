@@ -1,0 +1,14 @@
+{
+  "name": "scope3-investment",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scope 3 (Category 15 - Investments) financed-emissions calculator for HK & US listed companies",
+  "scripts": {
+    "serve": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "openai": "^6.48.0"
+  }
+}
