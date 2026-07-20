@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Briefing: The Carbon Cascade Series</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        executive: {
+                            dark: '#0B111E',
+                            card: '#151F32',
+                            border: '#23334D',
+                            textMuted: '#94A3B8',
+                            accent: '#3B82F6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts (Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0B111E;
+        }
+        /* Pulse wave animation for connection paths */
+        @keyframes wave {
+            to {
+                stroke-dashoffset: -24;
+            }
+        }
+        .animated-cascade-line {
+            stroke-dasharray: 8, 4;
+            animation: wave 1.2s linear infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between p-4 md:p-8">
+
+    <!-- Top Executive Header -->
+    <header class="max-w-6xl mx-auto w-full mb-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-executive-border pb-6">
+            <div>
+                <span class="text-xs font-semibold tracking-widest text-emerald-400 uppercase">Boardroom Briefing Tool</span>
+                <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-white mt-1">
+                    The Carbon Cascade
+                </h1>
+                <p class="text-sm text-executive-textMuted mt-1">
+                    Visualizing how operational decisions split across corporate balance sheets.
+                </p>
+            </div>
+            
+            <!-- Slide Selector / Tab Navigation -->
+            <div class="bg-slate-900 border border-executive-border p-1 rounded-xl flex gap-1 w-full md:w-auto">
+                <button id="btn-upstream" onclick="switchSlide('upstream')" class="flex-1 md:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 bg-emerald-500 text-slate-950 shadow-lg">
+                    1. Upstream Supplier
+                </button>
+                <button id="btn-downstream" onclick="switchSlide('downstream')" class="flex-1 md:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 text-slate-400 hover:text-white">
+                    2. Downstream Leased Assets
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Board Slide Layout -->
+    <main class="max-w-6xl w-full mx-auto flex-grow flex flex-col gap-6 justify-center">
+        
+        <!-- ================= SLIDE 1: UPSTREAM (THE CARBON HANDSHAKE) ================= -->
+        <div id="slide-upstream" class="space-y-6">
+            <!-- Interactive Value Chain Visualization -->
+            <div class="bg-executive-card border border-executive-border rounded-2xl p-6 md:p-8 relative overflow-hidden shadow-2xl">
+                <div class="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-11 gap-8 items-center relative z-10">
+                    
+                    <!-- Entity A: The Supplier (Our Supply Chain) -->
+                    <div class="lg:col-span-4 bg-slate-900/60 p-6 rounded-xl border border-executive-border/60 transition-all duration-500" id="supplier-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <span class="text-[10px] font-extrabold tracking-wider text-amber-400 uppercase">Upstream Partner</span>
+                                <h3 class="text-lg font-bold text-white mt-0.5">Your Key Supplier</h3>
+                            </div>
+                            <span class="px-2 py-1 bg-slate-800 text-[10px] text-slate-400 rounded uppercase font-bold">Company A</span>
+                        </div>
+
+                        <p class="text-xs text-executive-textMuted mb-6 leading-relaxed">
+                            To manufacture materials we purchase, this supplier runs machinery and consumes utility grid electricity.
+                        </p>
+
+                        <!-- Supplier Breakdown -->
+                        <div class="space-y-4">
+                            <div class="p-3.5 bg-slate-950/80 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="font-semibold text-slate-300">Scope 1 (Direct Fuels)</span>
+                                    <span class="font-mono font-bold text-amber-400" id="supplier-s1-val">60 Tons</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1 rounded-full mt-2 overflow-hidden">
+                                    <div class="bg-amber-400 h-full transition-all duration-500" id="supplier-s1-bar" style="width: 60%;"></div>
+                                </div>
+                            </div>
+
+                            <div class="p-3.5 bg-slate-950/80 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="font-semibold text-slate-300">Scope 2 (Grid Electricity)</span>
+                                    <span class="font-mono font-bold text-cyan-400" id="supplier-s2-val">40 Tons</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1 rounded-full mt-2 overflow-hidden">
+                                    <div class="bg-cyan-400 h-full transition-all duration-500" id="supplier-s2-bar" style="width: 40%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Block -->
+                        <div class="mt-6 pt-5 border-t border-slate-800/80 flex justify-between items-baseline">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Supplier Footprint:</span>
+                            <div class="text-right">
+                                <span class="text-2xl font-black text-white transition-all duration-500" id="supplier-total">100</span>
+                                <span class="text-xs text-executive-textMuted ml-1">Tons CO₂e</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visual Connection / The Cascade Transfer -->
+                    <div class="lg:col-span-3 flex flex-col items-center justify-center py-4 lg:py-0">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-center">We Buy Their Materials</span>
+                        
+                        <!-- SVG Link Line -->
+                        <svg class="w-full h-12 max-w-[200px] lg:max-w-none" viewBox="0 0 160 40" fill="none">
+                            <path d="M 10 20 L 150 20" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+                            <path id="cascade-flow" d="M 10 20 L 150 20" stroke="url(#line-gradient)" stroke-width="4" stroke-linecap="round" class="animated-cascade-line"/>
+                            
+                            <defs>
+                                <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#f59e0b" id="grad-start"/>
+                                    <stop offset="100%" stop-color="#10b981" id="grad-end"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        
+                        <span class="text-xs text-center text-emerald-400 font-semibold px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mt-2">
+                            100% Cascade Transfer
+                        </span>
+                    </div>
+
+                    <!-- Entity B: Our Company (The Buyer) -->
+                    <div class="lg:col-span-4 bg-emerald-950/10 p-6 rounded-xl border-2 border-emerald-500/20 transition-all duration-500" id="buyer-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <span class="text-[10px] font-extrabold tracking-wider text-emerald-400 uppercase">Our Enterprise</span>
+                                <h3 class="text-lg font-bold text-white mt-0.5">Our Corporate Footprint</h3>
+                            </div>
+                            <span class="px-2 py-1 bg-emerald-950/40 text-[10px] text-emerald-400 rounded uppercase font-bold">Company B (Us)</span>
+                        </div>
+
+                        <p class="text-xs text-executive-textMuted mb-6 leading-relaxed">
+                            Because we consume their materials, their full manufacturing footprint (Scope 1 & 2) belongs directly under our Scope 3 reporting.
+                        </p>
+
+                        <!-- Our Highlight Scope 3 Box -->
+                        <div class="p-5 bg-slate-950/80 rounded-xl border-2 border-emerald-500/40 shadow-inner relative overflow-hidden transition-all duration-500" id="scope3-highlight-box">
+                            <div class="absolute inset-0 bg-emerald-500/[0.02] pointer-events-none"></div>
+                            <span class="text-[10px] font-bold tracking-widest text-emerald-400 uppercase block mb-1">Our Scope 3 (Purchased Goods)</span>
+                            
+                            <div class="flex items-baseline justify-between mt-2">
+                                <span class="text-3xl font-black text-emerald-400 transition-all duration-500" id="buyer-scope3">100</span>
+                                <span class="text-xs text-emerald-500 font-bold">Tons CO₂e</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-2 leading-tight">
+                                Directly mirrors the supplier's combined operational footprint.
+                            </p>
+                        </div>
+
+                        <!-- Operational Footprint Info -->
+                        <div class="mt-4 flex gap-2 justify-between text-[11px] text-executive-textMuted bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/60">
+                            <span>Our Own Scope 1 & 2 (Offices/Retail):</span>
+                            <span class="font-bold text-white">15 Tons</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Single Executive Interactive Slider -->
+            <div class="bg-slate-900/60 border border-executive-border rounded-xl p-5 md:p-6 flex flex-col md:flex-row items-center gap-6 justify-between">
+                <div class="md:w-1/2">
+                    <span class="text-[10px] uppercase font-bold text-indigo-400">Board Simulation Control</span>
+                    <h4 class="text-base font-bold text-white mt-0.5">Supplier Decarbonization Level</h4>
+                    <p class="text-xs text-executive-textMuted mt-1 leading-relaxed">
+                        Slide to simulate the supplier transitioning to 100% clean power and energy-efficient factory operations.
+                    </p>
+                </div>
+                <div class="w-full md:w-1/2 flex flex-col gap-2">
+                    <div class="flex justify-between items-center text-xs font-semibold">
+                        <span class="text-rose-400">Carbon Intensive (BAU)</span>
+                        <span class="text-emerald-400">Net-Zero Supplier</span>
+                    </div>
+                    <!-- Slider starting at 0% (Carbon Intensive). Moving it to 100% represents full decarbonization. -->
+                    <input type="range" id="carbon-slider" min="0" max="100" value="0" class="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    <div class="flex justify-between text-[10px] text-slate-500">
+                        <span>(Emissions at Max)</span>
+                        <span>(Emissions at Min)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3-Column Board Takeaway Brief -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-executive-card/40 border border-executive-border/60 p-5 rounded-xl">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
+                        <span class="text-amber-400 text-sm">💡</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-1.5">Their Scope 1/2 is Our Scope 3</h4>
+                    <p class="text-xs text-executive-textMuted leading-relaxed">
+                        Under the global GHG Corporate Protocol, carbon tracks downstream. A supplier's direct emissions automatically translate into our indirect Scope 3 procurement liability.
+                    </p>
+                </div>
+
+                <div class="bg-executive-card/40 border border-executive-border/60 p-5 rounded-xl">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
+                        <span class="text-emerald-400 text-sm">⚡</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-1.5">Procurement is Our Leverage</h4>
+                    <p class="text-xs text-executive-textMuted leading-relaxed">
+                        We cannot reach corporate Net-Zero targets by only greening our own offices. Our single biggest carbon reduction lever is choosing and incentivizing green suppliers.
+                    </p>
+                </div>
+
+                <div class="bg-executive-card/40 border border-executive-border/60 p-5 rounded-xl">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-3">
+                        <span class="text-indigo-400 text-sm">📈</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-1.5">The Double Counting Design</h4>
+                    <p class="text-xs text-executive-textMuted leading-relaxed">
+                        Yes, these emissions are counted on both corporate sheets. This is intentional to ensure both companies are mutually motivated to collaborate on systemic carbon reductions.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= SLIDE 2: DOWNSTREAM LEASED ASSETS (THE EQUIPMENT CASCADE) ================= -->
+        <div id="slide-downstream" class="space-y-6 hidden">
+            <!-- Interactive Value Chain Visualization -->
+            <div class="bg-executive-card border border-executive-border rounded-2xl p-6 md:p-8 relative overflow-hidden shadow-2xl">
+                <div class="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-11 gap-8 items-center relative z-10">
+                    
+                    <!-- Entity A: Our Enterprise (The Lessor) -->
+                    <div class="lg:col-span-4 bg-emerald-950/10 p-6 rounded-xl border-2 border-emerald-500/20 transition-all duration-500" id="lessor-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <span class="text-[10px] font-extrabold tracking-wider text-emerald-400 uppercase">Asset Owner / Lessor</span>
+                                <h3 class="text-lg font-bold text-white mt-0.5">Our Enterprise</h3>
+                            </div>
+                            <span class="px-2 py-1 bg-emerald-950/40 text-[10px] text-emerald-400 rounded uppercase font-bold">Company B (Us)</span>
+                        </div>
+
+                        <p class="text-xs text-executive-textMuted mb-6 leading-relaxed">
+                            We own industrial machinery or fleets and lease them to customers. Because we own the assets, their operation dictates our downstream footprint.
+                        </p>
+
+                        <!-- Our Highlight Scope 3 Box (Category 13) -->
+                        <div class="p-5 bg-slate-950/80 rounded-xl border-2 border-emerald-500/40 shadow-inner relative overflow-hidden transition-all duration-500" id="scope3-downstream-box">
+                            <div class="absolute inset-0 bg-emerald-500/[0.02] pointer-events-none"></div>
+                            <span class="text-[10px] font-bold tracking-widest text-emerald-400 uppercase block mb-1">Our Scope 3 (Downstream Leased Assets)</span>
+                            
+                            <div class="flex items-baseline justify-between mt-2">
+                                <span class="text-3xl font-black text-emerald-400 transition-all duration-500" id="lessor-scope3">150</span>
+                                <span class="text-xs text-emerald-500 font-bold">Tons CO₂e</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-2 leading-tight">
+                                Directly mirrors the carbon intensity of fuels burned inside our leased fleets.
+                            </p>
+                        </div>
+
+                        <!-- Operational Footprint Info -->
+                        <div class="mt-4 flex gap-2 justify-between text-[11px] text-executive-textMuted bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/60">
+                            <span>Our Direct Scope 1 & 2 (Factory/Mfg):</span>
+                            <span class="font-bold text-white">45 Tons</span>
+                        </div>
+                    </div>
+
+                    <!-- Visual Connection / The Downstream Flow -->
+                    <div class="lg:col-span-3 flex flex-col items-center justify-center py-4 lg:py-0">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-center">We Lease Them Equipment</span>
+                        
+                        <!-- SVG Link Line (Reversed flow back to us) -->
+                        <svg class="w-full h-12 max-w-[200px] lg:max-w-none" viewBox="0 0 160 40" fill="none">
+                            <path d="M 150 20 L 10 20" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+                            <path id="downstream-flow" d="M 150 20 L 10 20" stroke="url(#line-gradient-downstream)" stroke-width="4" stroke-linecap="round" class="animated-cascade-line"/>
+                            
+                            <defs>
+                                <linearGradient id="line-gradient-downstream" x1="100%" y1="0%" x2="0%" y2="0%">
+                                    <stop offset="0%" stop-color="#f59e0b" id="grad-start-downstream"/>
+                                    <stop offset="100%" stop-color="#10b981" id="grad-end-downstream"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        
+                        <span class="text-xs text-center text-emerald-400 font-semibold px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mt-2">
+                            Indirect Footprint Ownership
+                        </span>
+                    </div>
+
+                    <!-- Entity B: The Client / Lessee (Who utilizes our asset) -->
+                    <div class="lg:col-span-4 bg-slate-900/60 p-6 rounded-xl border border-executive-border/60 transition-all duration-500" id="client-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <span class="text-[10px] font-extrabold tracking-wider text-amber-400 uppercase">Lease Partner / Operator</span>
+                                <h3 class="text-lg font-bold text-white mt-0.5">Your Client (Lessee)</h3>
+                            </div>
+                            <span class="px-2 py-1 bg-slate-800 text-[10px] text-slate-400 rounded uppercase font-bold">Company C</span>
+                        </div>
+
+                        <p class="text-xs text-executive-textMuted mb-6 leading-relaxed">
+                            The client operates our equipment on their sites. The fuels they choose to burn in this equipment are direct emissions for them.
+                        </p>
+
+                        <!-- Client Scope 1 Breakdown -->
+                        <div class="space-y-4">
+                            <div class="p-3.5 bg-slate-950/80 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="font-semibold text-slate-300">Client Scope 1 (Direct Fuel Burned)</span>
+                                    <span class="font-mono font-bold text-amber-400" id="client-s1-val">150 Tons</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1 rounded-full mt-2 overflow-hidden">
+                                    <div class="bg-amber-400 h-full transition-all duration-500" id="client-s1-bar" style="width: 100%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info tag on equipment fuel type -->
+                        <div class="mt-6 pt-5 border-t border-slate-800/80 flex flex-col gap-1.5">
+                            <div class="flex justify-between items-baseline">
+                                <span class="text-xs font-bold text-slate-400 uppercase">Operator Fuel Choice:</span>
+                                <span id="client-fuel-badge" class="px-2.5 py-1 rounded bg-rose-500/20 text-rose-400 font-extrabold text-[10px] uppercase">Heavy Diesel</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Fuel Selector Interactive Slider -->
+            <div class="bg-slate-900/60 border border-executive-border rounded-xl p-5 md:p-6 flex flex-col md:flex-row items-center gap-6 justify-between">
+                <div class="md:w-1/2">
+                    <span class="text-[10px] uppercase font-bold text-indigo-400">Board Simulation Control</span>
+                    <h4 class="text-base font-bold text-white mt-0.5">Client Fuel & Energy Selection</h4>
+                    <p class="text-xs text-executive-textMuted mt-1 leading-relaxed">
+                        Slide to simulate the client choosing cleaner fuel mixtures or switching to green electric charging for our leased equipment.
+                    </p>
+                </div>
+                <div class="w-full md:w-1/2 flex flex-col gap-2">
+                    <div class="flex justify-between items-center text-xs font-semibold">
+                        <span class="text-rose-400">Heavy Diesel (BAU)</span>
+                        <span class="text-emerald-400">Hydrogen / Electric</span>
+                    </div>
+                    <!-- Slider starting at 0% (Heavy Diesel). Moving to 100% represents zero carbon source (Electric/Green H2). -->
+                    <input type="range" id="fuel-slider" min="0" max="100" value="0" class="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    <div class="flex justify-between text-[10px] text-slate-500">
+                        <span>(100% Carbon Intensity)</span>
+                        <span>(Zero Operational Fuel Carbon)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Downstream Strategic Brief -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-executive-card/40 border border-executive-border/60 p-5 rounded-xl">
+                    <div class="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mb-3">
+                        <span class="text-orange-400 text-sm">🛠️</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-1.5">Asset Design is Our Destiny</h4>
+                    <p class="text-xs text-executive-textMuted leading-relaxed">
+                        If we manufacture and lease equipment that can *only* burn dirty diesel, we lock ourselves into high downstream Scope 3 footprints for decades. Hybrid or multi-fuel compatibility is key.
+                    </p>
+                </div>
+
+                <div class="bg-executive-card/40 border border-executive-border/60 p-5 rounded-xl">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-3">
+                        <span class="text-blue-400 text-sm">📋</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-1.5">"Green Lease" Frameworks</h4>
+                    <p class="text-xs text-executive-textMuted leading-relaxed">
+                        We can offer financial incentives or contract structures that bundle green fuel access (like biodiesel or electric charging credits) to make decarbonization easier for our clients.
+                    </p>
+                </div>
+
+                <div class="bg-executive-card/40 border border-executive-border/60 p-5 rounded-xl">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
+                        <span class="text-emerald-400 text-sm">🤝</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-1.5">Joint Scope Reduction</h4>
+                    <p class="text-xs text-executive-textMuted leading-relaxed">
+                        A client switching to green energy immediately lowers their Scope 1 direct operations while simultaneously vaporizing our Scope 3 liability. It is a true mutual benefit.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Executive Footer -->
+    <footer class="max-w-6xl mx-auto w-full border-t border-executive-border mt-8 pt-4 flex flex-col sm:flex-row justify-between text-[11px] text-slate-500">
+        <p>ESG Boardroom Briefing Series • Downstream Leased Assets (Category 13) vs Upstream (Category 1)</p>
+        <p class="mt-2 sm:mt-0">Confidential / For Internal Board Training Only</p>
+    </footer>
+
+    <!-- Presentation & Simulation Interactive Logic -->
+    <script>
+        // DOM Elements - Navigation
+        const slideUpstream = document.getElementById('slide-upstream');
+        const slideDownstream = document.getElementById('slide-downstream');
+        const btnUpstream = document.getElementById('btn-upstream');
+        const btnDownstream = document.getElementById('btn-downstream');
+
+        // DOM Elements - Slide 1 (Upstream)
+        const carbonSlider = document.getElementById('carbon-slider');
+        const s1Val = document.getElementById('supplier-s1-val');
+        const s2Val = document.getElementById('supplier-s2-val');
+        const s1Bar = document.getElementById('supplier-s1-bar');
+        const s2Bar = document.getElementById('supplier-s2-bar');
+        const supplierTotal = document.getElementById('supplier-total');
+        const buyerScope3 = document.getElementById('buyer-scope3');
+        const scope3Box = document.getElementById('scope3-highlight-box');
+        const buyerCard = document.getElementById('buyer-card');
+        const gradStart = document.getElementById('grad-start');
+        const gradEnd = document.getElementById('grad-end');
+
+        // DOM Elements - Slide 2 (Downstream Leased Assets)
+        const fuelSlider = document.getElementById('fuel-slider');
+        const clientS1Val = document.getElementById('client-s1-val');
+        const clientS1Bar = document.getElementById('client-s1-bar');
+        const clientFuelBadge = document.getElementById('client-fuel-badge');
+        const lessorScope3 = document.getElementById('lessor-scope3');
+        const scope3DownstreamBox = document.getElementById('scope3-downstream-box');
+        const lessorCard = document.getElementById('lessor-card');
+        const gradStartDownstream = document.getElementById('grad-start-downstream');
+        const gradEndDownstream = document.getElementById('grad-end-downstream');
+
+
+        // Switch between presentation slides
+        function switchSlide(slideType) {
+            if (slideType === 'upstream') {
+                slideUpstream.classList.remove('hidden');
+                slideDownstream.classList.add('hidden');
+                
+                btnUpstream.className = "flex-1 md:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 bg-emerald-500 text-slate-950 shadow-lg";
+                btnDownstream.className = "flex-1 md:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 text-slate-400 hover:text-white";
+            } else {
+                slideUpstream.classList.add('hidden');
+                slideDownstream.classList.remove('hidden');
+                
+                btnUpstream.className = "flex-1 md:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 text-slate-400 hover:text-white";
+                btnDownstream.className = "flex-1 md:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 bg-emerald-500 text-slate-950 shadow-lg";
+            }
+        }
+
+        // Slide 1 Calculations (Corrected & Aligned Slider Math)
+        function updateUpstreamSlide() {
+            // Slider value runs from 0 (Carbon Intensive) to 100 (Net-Zero).
+            // Multiplier must represent remaining carbon (100% down to 0%).
+            const percent = (100 - parseInt(carbonSlider.value)) / 100;
+            
+            // Proportional calculations
+            const currentScope1 = Math.round(60 * percent);
+            const currentScope2 = Math.round(40 * percent);
+            const combinedSupplierTotal = currentScope1 + currentScope2;
+
+            // Update Supplier side values
+            s1Val.innerText = `${currentScope1} Tons`;
+            s2Val.innerText = `${currentScope2} Tons`;
+            s1Bar.style.width = `${(currentScope1 / 60) * 100}%`;
+            s2Bar.style.width = `${(currentScope2 / 40) * 100}%`;
+            supplierTotal.innerText = combinedSupplierTotal;
+
+            // Update Our Company Scope 3 value (1:1 cascade)
+            buyerScope3.innerText = combinedSupplierTotal;
+
+            // Visual feedback transitions based on carbon intensity
+            if (percent < 0.25) {
+                // Highly decarbonized green state
+                scope3Box.style.borderColor = '#10b981';
+                buyerScope3.style.color = '#34d399';
+                gradStart.setAttribute('stop-color', '#34d399');
+                gradEnd.setAttribute('stop-color', '#10b981');
+                buyerCard.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            } else if (percent < 0.75) {
+                // Moderate yellow transition state
+                scope3Box.style.borderColor = '#3b82f6';
+                buyerScope3.style.color = '#60a5fa';
+                gradStart.setAttribute('stop-color', '#f59e0b');
+                gradEnd.setAttribute('stop-color', '#3b82f6');
+                buyerCard.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+            } else {
+                // High carbon warning state (Default red-warning)
+                scope3Box.style.borderColor = '#ef4444';
+                buyerScope3.style.color = '#f87171';
+                gradStart.setAttribute('stop-color', '#f59e0b');
+                gradEnd.setAttribute('stop-color', '#ef4444');
+                buyerCard.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            }
+        }
+
+        // Slide 2 Calculations (Downstream Leased Assets)
+        function updateDownstreamSlide() {
+            // Slider value runs from 0 (Heavy Diesel) to 100 (Hydrogen / Electric).
+            // Multiplier must represent remaining carbon (100% down to 0%).
+            const percent = (100 - parseInt(fuelSlider.value)) / 100;
+            
+            // Baseline leased fleet usage causes 150 Tons CO2e at 100% intensity
+            const combinedLeaseTotal = Math.round(150 * percent);
+
+            // Update client side values
+            clientS1Val.innerText = `${combinedLeaseTotal} Tons`;
+            clientS1Bar.style.width = `${(combinedLeaseTotal / 150) * 100}%`;
+
+            // Dynamic badge text reflecting the chemical/energy nature of the asset usage
+            if (percent === 1) {
+                clientFuelBadge.innerText = "Heavy Diesel";
+                clientFuelBadge.className = "px-2.5 py-1 rounded bg-rose-500/20 text-rose-400 font-extrabold text-[10px] uppercase";
+            } else if (percent > 0.6) {
+                clientFuelBadge.innerText = "Diesel/Biofuel Mix";
+                clientFuelBadge.className = "px-2.5 py-1 rounded bg-amber-500/20 text-amber-400 font-extrabold text-[10px] uppercase";
+            } else if (percent > 0.2) {
+                clientFuelBadge.innerText = "100% Biodiesel (HVO)";
+                clientFuelBadge.className = "px-2.5 py-1 rounded bg-blue-500/20 text-blue-400 font-extrabold text-[10px] uppercase";
+            } else if (percent > 0) {
+                clientFuelBadge.innerText = "Hybrid Fuel Grid";
+                clientFuelBadge.className = "px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-300 font-extrabold text-[10px] uppercase";
+            } else {
+                clientFuelBadge.innerText = "Electric / Hydrogen";
+                clientFuelBadge.className = "px-2.5 py-1 rounded bg-emerald-500/35 text-emerald-400 font-extrabold text-[10px] uppercase";
+            }
+
+            // Update Our Company Scope 3 Category 13 value (direct mirror)
+            lessorScope3.innerText = combinedLeaseTotal;
+
+            // Visual feedback transitions based on carbon intensity
+            if (percent < 0.25) {
+                scope3DownstreamBox.style.borderColor = '#10b981';
+                lessorScope3.style.color = '#34d399';
+                gradStartDownstream.setAttribute('stop-color', '#34d399');
+                gradEndDownstream.setAttribute('stop-color', '#10b981');
+                lessorCard.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            } else if (percent < 0.75) {
+                scope3DownstreamBox.style.borderColor = '#3b82f6';
+                lessorScope3.style.color = '#60a5fa';
+                gradStartDownstream.setAttribute('stop-color', '#f59e0b');
+                gradEndDownstream.setAttribute('stop-color', '#3b82f6');
+                lessorCard.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+            } else {
+                scope3DownstreamBox.style.borderColor = '#ef4444';
+                lessorScope3.style.color = '#f87171';
+                gradStartDownstream.setAttribute('stop-color', '#f59e0b');
+                gradEndDownstream.setAttribute('stop-color', '#ef4444');
+                lessorCard.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            }
+        }
+
+        // Add event listeners
+        carbonSlider.addEventListener('input', updateUpstreamSlide);
+        fuelSlider.addEventListener('input', updateDownstreamSlide);
+
+        // Run baseline setup
+        updateUpstreamSlide();
+        updateDownstreamSlide();
+    </script>
+</body>
+</html>
