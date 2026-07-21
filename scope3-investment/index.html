@@ -206,7 +206,7 @@
   <div class="notice">
     <strong>計算方法：</strong>
     歸屬因子 = 投資市值 ÷ 企業價值（EVIC）；融資排放 = 歸屬因子 ×（被投資公司範圍一、二排放）。
-    排放數據由 AI（NVIDIA NIM 模型）根據其訓練知識估算，來源為公司公開可持續發展報告與 ESG 披露。
+    排放數據由 AI（預設 NVIDIA MiniMax M3，亦可切換至 Groq Llama 3.1 8B）根據其訓練知識估算，來源為公司公開可持續發展報告與 ESG 披露。
     若 AI 未能辨識某股票，您仍可<strong>手動輸入</strong>該公司排放數據繼續計算。
   </div>
 
@@ -232,9 +232,8 @@
       <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:#475569;align-self:center">
         AI 模型
         <select id="modelSelect" style="font-size:0.8rem;padding:0.4rem 0.6rem;border:1px solid #e2e8f0;border-radius:0.4rem;background:#fff;color:#0f172a">
-          <option value="nemotron">NVIDIA Nemotron 3 Nano (30B)</option>
-          <option value="gemma">Google Gemma 4 (31B)</option>
-          <option value="minimax">MiniMax M3</option>
+          <option value="minimax" selected>NVIDIA MiniMax M3</option>
+          <option value="groq">Groq Llama 3.1 8B Instant</option>
         </select>
       </label>
       <button class="btn btn-ghost" id="btnClear" style="font-size:0.8rem;padding:0.4rem 0.9rem">清空全部</button>
@@ -303,7 +302,7 @@
 
       <section>
         <h3>4. 數據來源：數據從哪裡來？</h3>
-        <p>所有排放與財務數字均由 <strong>NVIDIA NIM AI 模型</strong>生成。模型並非即時連網抓取，而是依據其<strong>訓練時所學習的公開資料</strong>進行估算，主要來源包括：</p>
+        <p>所有排放與財務數字均由 <strong>AI 模型生成</strong>（目前支援 Groq Llama 3.1 8B Instant 與 NVIDIA MiniMax M3，可在平台右上角切換）。模型並非即時連網抓取，而是依據其<strong>訓練時所學習的公開資料</strong>進行估算，主要來源包括：</p>
         <ul>
           <li>公司官方《可持續發展報告 / ESG 報告》與《年度報告（年報）》</li>
           <li>CDP（碳披露項目）氣候變遷問卷之公開披露</li>
@@ -330,17 +329,24 @@
           <li>模型不具備即時網頁檢索能力，數據來自其訓練知識，對冷門或新上市公司可能無法辨識——此時請使用「手動輸入」後備。</li>
           <li>正式用途請接入 CDP、Bloomberg、Moody's 等權威 ESG 數據庫，或以企業官方報告核實。</li>
         </ul>
-        <p class="tag-note">本說明對應模型：<code>nvidia/nemotron-3-nano-30b-a3b</code></p>
+        <p class="tag-note">本說明對應模型：<code>llama-3.1-8b-instant</code>（Groq）／ <code>minimaxai/minimax-m3</code>（NVIDIA）</p>
       </section>
     </div>
   </div>
 </main>
 
-<footer>GHG Protocol Scope 3 Category 15 · PCAF Financed Emissions · Powered by NVIDIA NIM</footer>
+<footer>GHG Protocol Scope 3 Category 15 · PCAF Financed Emissions · Powered by Groq / NVIDIA</footer>
 
 <div id="printReport" aria-hidden="true"></div>
 
 <script>
+// ============================================================================
+// The API runs on the SAME server that serves this page.
+// No extra proxy or API_BASE config needed — deploy server.js to Render /
+// Railway / Fly.io and everything works on ONE URL.
+// ============================================================================
+const API_BASE = "";
+
 const HKD_TO_USD = 0.128;
 const CACHE_PREFIX = "s3_emissions_";
 const PORTFOLIO_KEY = "s3_portfolio_v2";
@@ -409,7 +415,7 @@ function calcFinanced(shares, co) {
   return attr * (co.scope1 + co.scope2);
 }
 
-function getCacheKey(symbol, market, model) { return CACHE_PREFIX + (model || "nemotron") + ":" + market + ":" + symbol; }
+function getCacheKey(symbol, market, model) { return CACHE_PREFIX + (model || "minimax") + ":" + market + ":" + symbol; }
 function getCached(symbol, market, model) {
   try {
     const raw = localStorage.getItem(getCacheKey(symbol, market, model));
@@ -427,11 +433,14 @@ function uid() { return crypto.randomUUID ? crypto.randomUUID() : Date.now().toS
 
 // --- Model switcher state ----------------------------------------------------
 const MODEL_KEY = "scope3_model";
-const MODEL_LABELS = { nemotron: "NVIDIA Nemotron 3 Nano (30B)", gemma: "Google Gemma 4 (31B)", minimax: "MiniMax M3" };
+const MODEL_LABELS = {
+  groq: "Groq Llama 3.1 8B Instant",
+  minimax: "NVIDIA MiniMax M3",
+};
 function getModel() {
   const sel = document.getElementById("modelSelect");
   const fromSel = sel && sel.value ? sel.value : null;
-  return fromSel || localStorage.getItem(MODEL_KEY) || "nemotron";
+  return fromSel || localStorage.getItem(MODEL_KEY) || "minimax";
 }
 function modelLabel(key) { return MODEL_LABELS[key] || key; }
 
@@ -454,12 +463,12 @@ async function fetchEmissions(ticker, forceRefresh = false, modelKey = getModel(
     const cached = getCached(parsed.symbol, parsed.market, modelKey);
     if (cached) return { ...cached, fromCache: true };
   }
-  const res = await fetch(`/api/emissions?ticker=${encodeURIComponent(ticker)}&model=${encodeURIComponent(modelKey)}`);
+  const res = await fetch(`${API_BASE}/api/emissions?ticker=${encodeURIComponent(ticker)}&model=${encodeURIComponent(modelKey)}`);
   const ct = res.headers.get("content-type") || "";
   if (!ct.includes("application/json")) {
-    // Backend returned HTML (e.g. a static host's 404 / server not running server.js).
+    // Server returned non-JSON (e.g. server not running / wrong URL).
     throw new Error(
-      "API 伺服器沒有回傳 JSON。網站可能部署在「靜態主機」(如 GitHub Pages)，無法執行 server.js。請改用可執行 Node 的主機 (Render / Railway / Fly.io)，或在伺服器上確認 server.js 正在運行且環境變數已設定。"
+      "伺服器沒有回傳 JSON。請確認 server.js 已部署並正常運行（如 Render / Railway），且你打開的是伺服器網址，而非直接開啟 index.html。"
     );
   }
   const data = await res.json();
@@ -741,7 +750,7 @@ async function initModelSwitch() {
   const sel = document.getElementById("modelSelect");
   const stored = localStorage.getItem(MODEL_KEY);
   try {
-    const r = await fetch("/api/health");
+    const r = await fetch(`${API_BASE}/api/health`);
     const ct = r.headers.get("content-type") || "";
     if (!ct.includes("application/json")) throw new Error("no-backend");
     const h = await r.json();
@@ -750,7 +759,7 @@ async function initModelSwitch() {
         .map(m => `<option value="${m.key}">${m.label}</option>`)
         .join("");
     }
-    const def = stored || h.default || "nemotron";
+    const def = stored || h.default || "minimax";
     if ([...sel.options].some(o => o.value === def)) sel.value = def;
   } catch {
     if (stored && [...sel.options].some(o => o.value === stored)) sel.value = stored;

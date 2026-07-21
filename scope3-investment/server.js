@@ -1,76 +1,54 @@
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
+/**
+ * Scope 3 (Category 15 — Investments) emissions calculator.
+ *
+ * Zero-dependency Node.js server.
+ * Serves index.html as a static site AND handles /api/health + /api/emissions.
+ *
+ * Deploy to Render / Railway / Fly.io / any Node host:
+ *   Start command: node server.js
+ *
+ * No API_BASE config needed — everything runs on ONE URL.
+ */
 
-// --- Minimal .env loader (no `dotenv` dependency) ---------------------------
-// Reads .env if present, but never overrides variables already in the
-// environment (so cloud-platform env vars take precedence). This keeps the app
-// dependency-free: `node server.js` is all you need after upload.
-(function loadEnv() {
-  try {
-    const txt = fs.readFileSync(path.join(__dirname, ".env"), "utf8");
-    for (const line of txt.split("\n")) {
-      const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)\s*$/);
-      if (m && process.env[m[1]] === undefined) {
-        process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
-      }
-    }
-  } catch {}
-})();
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const PORT = process.env.PORT || 8080;
-const RETRIES = parseInt(process.env.API_RETRIES || "1", 10); // extra attempts on failure
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+const PORT = process.env.PORT || 3000;
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const cache = new Map();
-
-// --- Model registry ---------------------------------------------------------
-// Each model has its OWN NVIDIA API key and model-specific request params.
-// Keys are loaded from .env; the constants below are fallbacks so the server
-// still runs if .env is missing. Prefer setting them in .env (never commit).
-// NOTE: the gemma key was shared in chat — rotate it for any real deployment.
+// =============================================================================
+// Model registry
+// =============================================================================
 const MODELS = {
-  nemotron: {
-    label: "NVIDIA Nemotron 3 Nano (30B)",
-    id: "nvidia/nemotron-3-nano-30b-a3b",
-    apiKey:
-      process.env.NVIDIA_API_KEY ||
-      "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",
-    topP: 1,
-    // Nemotron accepts reasoning_budget as a direct body field (see queryModel).
-    extra: { reasoning_budget: Number(process.env.API_REASONING_BUDGET || 16384) },
-  },
-  gemma: {
-    label: "Google Gemma 4 (31B)",
-    id: "google/gemma-4-31b-it",
-    apiKey:
-      process.env.NVIDIA_API_KEY_GEMMA ||
-      "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",
-    topP: 0.95,
-    // Gemma uses chat_template_kwargs.enable_thinking instead of reasoning_budget.
-    extra: { chat_template_kwargs: { enable_thinking: true } },
-  },
   minimax: {
-    // MiniMax M3: shares the same NVIDIA key as Gemma (per the provided snippet).
-    // It uses max_tokens 8192 (smaller output budget than nemotron/gemma).
-    label: "MiniMax M3",
+    label: "NVIDIA MiniMax M3",
     id: "minimaxai/minimax-m3",
+    baseURL: "https://integrate.api.nvidia.com/v1",
     apiKey:
-      process.env.NVIDIA_API_KEY_GEMMA ||
       "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",
     topP: 0.95,
-    maxTokens: Number(process.env.API_MAX_TOKENS_MINIMAX || 8192),
     extra: {},
+    maxTokens: 8192,
+  },
+  groq: {
+    label: "Groq Llama 3.1 8B Instant",
+    id: "llama-3.1-8b-instant",
+    baseURL: "https://api.groq.com/openai/v1",
+    apiKey:
+      "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",
+    topP: 1,
+    extra: {},
+    maxTokens: 4096,
   },
 };
-const DEFAULT_MODEL = MODELS[process.env.NVIDIA_MODEL] ? process.env.NVIDIA_MODEL : "nemotron";
+const DEFAULT_MODEL = "minimax";
+const RETRIES = 1;
 
-/**
- * Disambiguation hints ONLY.
- * HKEX numeric codes are easy to confuse; these nudge the model toward the
- * correct company. They are NOT an authoritative emissions data source — every
- * value is still produced by the model from its own (training) knowledge.
- */
+// =============================================================================
+// HKEX hints
+// =============================================================================
 const HK_HINTS = {
   "0001": "CK Hutchison Holdings (長江和記實業)",
   "0002": "CLP Holdings (中電控股)",
@@ -110,20 +88,21 @@ const HK_HINTS = {
   "9988": "Alibaba Group (阿里巴巴)",
 };
 
+// =============================================================================
+// Helpers
+// =============================================================================
 function parseTicker(input) {
   const trimmed = (input || "").trim().toUpperCase();
   if (!trimmed) return null;
-
   if (trimmed.endsWith(".HK")) {
-    const symbol = trimmed.slice(0, -3).replace(/^0+/, "") || "0";
-    return { symbol: symbol.padStart(4, "0"), market: "HK", display: `${symbol.padStart(4, "0")}.HK` };
+    const sym = trimmed.slice(0, -3).replace(/^0+/, "") || "0";
+    return { symbol: sym.padStart(4, "0"), market: "HK", display: sym.padStart(4, "0") + ".HK" };
   }
   if (trimmed.endsWith(".US")) {
     return { symbol: trimmed.slice(0, -3), market: "US", display: trimmed.slice(0, -3) };
   }
   if (/^\d{1,5}$/.test(trimmed)) {
-    const symbol = trimmed.padStart(4, "0");
-    return { symbol, market: "HK", display: `${symbol}.HK` };
+    return { symbol: trimmed.padStart(4, "0"), market: "HK", display: trimmed.padStart(4, "0") + ".HK" };
   }
   if (/^[A-Z][A-Z0-9.-]{0,9}$/.test(trimmed)) {
     return { symbol: trimmed, market: "US", display: trimmed };
@@ -134,20 +113,17 @@ function parseTicker(input) {
 function buildPrompt(parsed, attempt = 0) {
   const YEAR = new Date().getFullYear();
   const PREV = YEAR - 1;
-  const marketLabel =
-    parsed.market === "HK"
-      ? "Hong Kong Stock Exchange (HKEX)"
-      : "United States (NYSE / NASDAQ)";
+  const marketLabel = parsed.market === "HK"
+    ? "Hong Kong Stock Exchange (HKEX)"
+    : "United States (NYSE / NASDAQ)";
 
-  const hint =
-    parsed.market === "HK" && HK_HINTS[parsed.symbol]
-      ? `\nHINT: HKEX code ${parsed.symbol} most often maps to ${HK_HINTS[parsed.symbol]}. Verify the mapping — do not assume it blindly.`
-      : "";
+  const hint = parsed.market === "HK" && HK_HINTS[parsed.symbol]
+    ? `\nHINT: HKEX code ${parsed.symbol} most often maps to ${HK_HINTS[parsed.symbol]}. Verify the mapping — do not assume it blindly.`
+    : "";
 
-  const retryNote =
-    attempt > 0
-      ? `\nPREVIOUS ATTEMPT FAILED or returned no usable data. Re-examine the identifier carefully. If you can identify the company but lack precise figures, provide your BEST ESTIMATE with confidence "low" rather than returning an error. Never invent a company name.`
-      : "";
+  const retryNote = attempt > 0
+    ? `\nPREVIOUS ATTEMPT FAILED or returned no usable data. Re-examine the identifier carefully. If you can identify the company but lack precise figures, provide your BEST ESTIMATE with confidence "low" rather than returning an error. Never invent a company name.`
+    : "";
 
   return `You are a meticulous ESG / carbon-accounting research analyst with deep knowledge of publicly listed companies, especially in the United States (NYSE/NASDAQ) and Hong Kong (HKEX).
 
@@ -197,7 +173,6 @@ function toNumber(v) {
   if (typeof v === "number") return v;
   if (typeof v === "string") return Number(v.replace(/,/g, "").trim());
   if (v && typeof v === "object") {
-    // tolerate {marketBased, locationBased, total}
     const pick = v.marketBased ?? v.locationBased ?? v.total ?? v.value;
     return typeof pick === "number" ? pick : Number(pick);
   }
@@ -207,21 +182,16 @@ function toNumber(v) {
 function normalizeAndValidate(raw, parsed) {
   if (!raw || typeof raw !== "object") return { error: "AI 回應格式錯誤，請稍後再試" };
   if (raw.error) return { error: String(raw.error) };
-
   const name = (raw.name || "").toString().trim();
   if (!name) return { error: `找不到 ${parsed.display} 對應的公司，請確認股票代號是否正確` };
-
   const scope1 = toNumber(raw.scope1);
   const scope2 = toNumber(raw.scope2);
   if (!Number.isFinite(scope1) || !Number.isFinite(scope2) || scope1 < 0 || scope2 < 0) {
     return { error: `無法取得 ${parsed.display} 可靠的範圍一／範圍二排放數據` };
   }
-
   const total = scope1 + scope2;
   let confidence = ["high", "medium", "low"].includes(raw.confidence) ? raw.confidence : "medium";
-  // A zero-emissions result is implausible for a real company; downgrade confidence.
   if (total === 0) confidence = "low";
-
   return {
     ticker: parsed.display,
     market: parsed.market,
@@ -240,23 +210,22 @@ function normalizeAndValidate(raw, parsed) {
   };
 }
 
+// =============================================================================
+// Model query
+// =============================================================================
 async function queryModel(parsed, attempt, modelKey) {
   const m = MODELS[modelKey];
-
   const payload = {
     model: m.id,
     messages: [{ role: "user", content: buildPrompt(parsed, attempt) }],
     temperature: 1,
     top_p: m.topP,
-    max_tokens: m.maxTokens || Number(process.env.API_MAX_TOKENS || 16384),
-    // Per-model extras: nemotron -> reasoning_budget; gemma -> chat_template_kwargs.
+    max_tokens: m.maxTokens || 16384,
     ...m.extra,
     stream: false,
   };
 
-  // Direct call to the NVIDIA NIM OpenAI-compatible endpoint using Node's
-  // built-in fetch — no `openai` SDK required.
-  const resp = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+  const resp = await fetch(m.baseURL + "/chat/completions", {
     method: "POST",
     headers: {
       Authorization: "Bearer " + m.apiKey,
@@ -267,12 +236,17 @@ async function queryModel(parsed, attempt, modelKey) {
 
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    throw new Error("NVIDIA API HTTP " + resp.status + " " + body.slice(0, 200));
+    throw new Error(m.label + " API HTTP " + resp.status + " " + body.slice(0, 200));
   }
 
-  const data = await resp.json();
+  let data;
+  try {
+    data = await resp.json();
+  } catch {
+    throw new Error(m.label + " API 回傳非 JSON 內容");
+  }
   const content = data?.choices?.[0]?.message?.content || "";
-  if (!content) throw new Error("NVIDIA API 回傳空白內容");
+  if (!content) throw new Error(m.label + " API 回傳空白內容");
 
   let raw;
   try {
@@ -285,16 +259,9 @@ async function queryModel(parsed, attempt, modelKey) {
 
 async function fetchEmissions(parsed, modelKey) {
   const mk = MODELS[modelKey] ? modelKey : DEFAULT_MODEL;
-  const cacheKey = `${mk}:${parsed.market}:${parsed.symbol}`;
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return { ...cached.data, model: mk, cached: true };
-  }
-
   if (!MODELS[mk].apiKey) {
-    return { error: `未設定 ${mk} 模型的 NVIDIA API 金鑰，請在 .env 檔案中配置 NVIDIA_API_KEY（或 NVIDIA_API_KEY_GEMMA）` };
+    return { error: `未設定 ${mk} 模型的 API 金鑰` };
   }
-
   let last = null;
   for (let attempt = 0; attempt <= RETRIES; attempt++) {
     try {
@@ -302,40 +269,68 @@ async function fetchEmissions(parsed, modelKey) {
     } catch (err) {
       last = { error: "查詢失敗：" + err.message };
     }
-    // Stop early on a clean success.
     if (last && !last.error) break;
   }
-
-  if (!last || last.error) return { ...(last || {}), model: mk };
-
-  cache.set(cacheKey, { data: last, timestamp: Date.now() });
-  return { ...last, model: mk, cached: false };
+  return { ...(last || {}), model: mk };
 }
 
-function sendJson(res, status, body) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
+// =============================================================================
+// HTTP server
+// =============================================================================
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".md": "text/markdown",
+  ".map": "application/json",
+};
+
+function serveStatic(req, res, url) {
+  let filePath = path.join(DIR, url.pathname === "/" ? "index.html" : url.pathname);
+  const ext = path.extname(filePath).toLowerCase();
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      // File not found → serve index.html (SPA-friendly, also handles page refreshes)
+      fs.readFile(path.join(DIR, "index.html"), (err2, data2) => {
+        if (err2) {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end("404 Not Found");
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(data2);
+      });
+      return;
+    }
+    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+    res.end(data);
   });
-  res.end(JSON.stringify(body));
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`);
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+
+  // CORS headers (needed only if accessed from a different origin in dev)
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    });
-    return res.end();
+    res.writeHead(204);
+    res.end();
+    return;
   }
 
+  // --- API routes ---
   if (url.pathname === "/api/health") {
-    return sendJson(res, 200, {
+    const body = JSON.stringify({
       ok: true,
-      hasKey: Boolean(MODELS[DEFAULT_MODEL].apiKey),
       default: DEFAULT_MODEL,
       models: Object.entries(MODELS).map(([key, m]) => ({
         key,
@@ -344,45 +339,49 @@ const server = http.createServer(async (req, res) => {
         hasKey: Boolean(m.apiKey),
       })),
     });
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(body);
+    return;
   }
 
   if (url.pathname === "/api/emissions") {
     const ticker = url.searchParams.get("ticker");
     const modelKey = url.searchParams.get("model") || DEFAULT_MODEL;
-    if (!ticker) return sendJson(res, 400, { error: "缺少 ticker 參數" });
-    if (!MODELS[modelKey]) return sendJson(res, 400, { error: "不支援的模型：" + modelKey });
-
-    const parsed = parseTicker(ticker);
-    if (!parsed) return sendJson(res, 400, { error: "無效的股票代號格式" });
-
-    try {
-      const data = await fetchEmissions(parsed, modelKey);
-      return sendJson(res, data.error ? 404 : 200, data);
-    } catch (err) {
-      console.error("API error:", err.message);
-      return sendJson(res, 500, { error: "查詢失敗：" + err.message });
+    if (!ticker) {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "缺少 ticker 參數" }));
+      return;
     }
-  }
+    if (!MODELS[modelKey]) {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "不支援的模型：" + modelKey }));
+      return;
+    }
+    const parsed = parseTicker(ticker);
+    if (!parsed) {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "無效的股票代號格式" }));
+      return;
+    }
 
-  if (url.pathname === "/" || url.pathname === "/index.html") {
-    const filePath = path.join(__dirname, "index.html");
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(500);
-        return res.end("Error loading index.html");
-      }
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(data);
-    });
+    fetchEmissions(parsed, modelKey)
+      .then((data) => {
+        res.writeHead(data.error ? 404 : 200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify(data));
+      })
+      .catch((err) => {
+        res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "查詢失敗：" + err.message }));
+      });
     return;
   }
 
-  res.writeHead(404);
-  res.end("Not found");
+  // --- Static files ---
+  serveStatic(req, res, url);
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Scope 3 Calculator running at http://0.0.0.0:${PORT}`);
-  console.log(`Default model: ${DEFAULT_MODEL} (${MODELS[DEFAULT_MODEL].id}) — ${Object.keys(MODELS).length} model(s) registered`);
-  if (!MODELS[DEFAULT_MODEL].apiKey) console.warn("WARNING: default model API key not set — emissions lookup will fail");
+server.listen(PORT, () => {
+  console.log(`✓ Scope 3 emissions server running on http://localhost:${PORT}`);
+  console.log(`  Default model: ${DEFAULT_MODEL} (${MODELS[DEFAULT_MODEL].label})`);
+  console.log(`  Models available: ${Object.keys(MODELS).join(", ")}`);
 });
