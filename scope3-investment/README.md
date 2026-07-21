@@ -9,7 +9,7 @@
 | 檔案 | 用途 |
 |------|------|
 | `index.html` | 前端計算器界面（純 HTML/CSS/JS，無框架） |
-| `server.js` | Node.js 靜態伺服器 + NVIDIA API 代理（OpenAI SDK 模式，`base_url` 指向 NVIDIA NIM） |
+| `server.js` | Node.js 靜態伺服器 + NVIDIA API 代理（**零依賴**，使用 Node 內建 `fetch` 呼叫 NVIDIA NIM `integrate.api.nvidia.com/v1`） |
 
 > 本專案早期曾含一套 Next.js 實作（`src/`），其使用靜態示範數據、僅支援有限股票，且是原始「找不到股票代號」錯誤的來源。該版本已移除；現行 `index.html` + `server.js` 為唯一且完整的實作。
 
@@ -27,9 +27,10 @@ cp .env.example .env
 ### 2. 啟動伺服器
 
 ```bash
-npm install
-npm run serve          # 等同 node server.js
+node server.js          # 零依賴，直接執行即可（無須 npm install）
 ```
+
+> 本專案**不依賴任何 npm 套件**（已改用 Node 內建 `fetch` 呼叫 NVIDIA，並以自帶的微型 `.env` 載入器取代 `dotenv`），因此不存在 `node_modules`，也不需要 `npm install`。
 
 打開 **http://localhost:8080**
 
@@ -137,42 +138,72 @@ PORT=8080                    # 伺服器端口
 
 ## 關於 `reasoning_budget` 的實作備註
 
-用戶端以 OpenAI SDK 模式呼叫 NVIDIA：
+本專案以 Node 內建 `fetch` 直接呼叫 NVIDIA NIM 的 OpenAI 相容端點（`/v1/chat/completions`），並將 `reasoning_budget` 作為**直接 body 欄位**傳遞：
 
 ```js
-const client = new OpenAI({
-  apiKey: API_KEY,
-  baseURL: "https://integrate.api.nvidia.com/v1",
-});
-await client.chat.completions.create({
-  model: "nvidia/nemotron-3-nano-30b-a3b",
-  messages: [...],
-  temperature: 1,
-  top_p: 1,
-  max_tokens: 16384,
-  reasoning_budget: 16384,   // 直接作為 body 欄位傳遞
-  stream: true,
+await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+  method: "POST",
+  headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    model: "nvidia/nemotron-3-nano-30b-a3b",
+    messages: [...],
+    temperature: 1,
+    top_p: 1,
+    max_tokens: 16384,
+    reasoning_budget: 16384,   // 直接作為 body 欄位傳遞
+    stream: false,
+  }),
 });
 ```
 
-> **注意**：OpenAI **Node** SDK（v6.x）並不會像 Python SDK 那樣將 `extra_body` 合併進請求本體，而是把 `extra_body` 當作字面頂層欄位原樣送出，導致 NVIDIA 報錯 `Unsupported parameter(s): extra_body`。NVIDIA 接受 `reasoning_budget` 作為直接 body 欄位，因此本專案直接傳遞 `reasoning_budget`，達成與預期相同的線上 payload。
+> **注意**：早期版本使用 OpenAI **Node** SDK（v6.x）時，它並不會像 Python SDK 那樣將 `extra_body` 合併進請求本體，而是把 `extra_body` 當作字面頂層欄位原樣送出，導致 NVIDIA 報錯 `Unsupported parameter(s): extra_body`。現行版本已改用原生 `fetch`，直接把 `reasoning_budget` 放進 body 即可，無此問題，也無須安裝任何 SDK。
 
-## 部署到雲端
+## 部署到雲端（重要）
 
-將整個專案部署到任何支援 Node.js 的平台（Railway、Render、Fly.io、VPS 等）：
+> ⚠️ 本平台是 **Node.js 應用程式**，必須運行在「能執行 Node 的主機」上。它**不是純靜態網站**——前端 `index.html` 會呼叫 `/api/emissions`，該路由只能由 `server.js` 提供。若部署到「靜態主機」（如 **GitHub Pages**、Netlify Static 等），`server.js` 不會被執行，API 請求會拿到主機的 HTML 404 頁面，前端 `res.json()` 就會報 **`Unexpected token '<'`**。這正是「網站打開了、但查詢報錯」的典型原因。
+
+### 第一步：處理 API 金鑰（.env 不上傳 Git）
+
+- `.env` 含有金鑰，**絕對不要**提交到 Git（`.gitignore` 已排除 `.env`）。你看到「.env 無法上傳到 GitHub」是正常的、正確的行為。
+- 倉庫內保留 **`.env.example`**（無金鑰，可安全提交）作為變數清單。
+- 在雲端主機的 **環境變數設定頁**（dashboard）填入 `NVIDIA_API_KEY`、`NVIDIA_API_KEY_GEMMA`，**不要**上傳 `.env` 檔案本身。
+
+### 第二步：選擇可執行 Node 的主機
+
+**選項 A — Render / Railway / Fly.io（推薦，最簡單）**
+1. 把本倉庫推送到 GitHub。
+2. 在 Render / Railway 新建「Web Service」，連接該倉庫。
+3. 啟動命令（Start Command）填：`node server.js`
+4. 在環境變數設定頁加入：
+   - `NVIDIA_API_KEY=你的金鑰`
+   - `NVIDIA_API_KEY_GEMMA=你的金鑰`（Gemma / MiniMax 共用）
+   - `PORT` 由平台自動提供，不用手填
+5. 部署完成後，平台給你的網址即可線上使用。
+
+**選項 B — 自有 VPS（Linux）**
+```bash
+git clone <your-repo> && cd scope3-investment
+# 設定環境變數（不要放 .env 進 Git；或用 host 的 secret manager）
+export NVIDIA_API_KEY=your_key
+export NVIDIA_API_KEY_GEMMA=your_key
+node server.js &   # 建議用 pm2 / systemd 常駐
+```
+
+### 部署後檢查
 
 ```bash
-npm install
-NVIDIA_API_KEY=your_key PORT=8080 node server.js
+curl https://你的網址/api/health
+# 應回傳 JSON： {"ok":true,"models":[...]}  ← 若回傳 HTML，代表主機沒跑 server.js
 ```
 
 ## 技術棧
 
 - `index.html` — 純 HTML/CSS/JS，無框架依賴
-- `server.js` — Node.js HTTP 伺服器 + NVIDIA NIM Chat Completions API（OpenAI SDK，`base_url` 指向 `integrate.api.nvidia.com/v1`）
-- 依賴：`openai`、`dotenv`
+- `server.js` — Node.js HTTP 伺服器 + NVIDIA NIM Chat Completions API（**零依賴**，使用 Node 內建 `fetch` 呼叫 `integrate.api.nvidia.com/v1`）
+- 依賴：**無**（已移除 `openai` / `dotenv`）
 
 ## 安全提示
 
-- API 金鑰只放在伺服器端 `.env` 檔案或環境變數
-- `.env` 已在 `.gitignore` 中排除（本倉庫的 `.env` 為方便本地測試而保留，正式部署請自行替換）
+- API 金鑰只放在伺服器端環境變數或 `.env` 檔案（本機），**切勿**寫入前端或提交 Git。
+- 雲端部署時，金鑰透過主機的「環境變數」設定，不要上傳 `.env` 檔案。
+- 本倉庫的 `.env` 為方便本地測試而保留，正式部署請改用你自己的金鑰（聊天中貼出的 `nvapi-xecsp…` 金鑰建議在 NVIDIA 控制台輪換）。

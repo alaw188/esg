@@ -455,6 +455,13 @@ async function fetchEmissions(ticker, forceRefresh = false, modelKey = getModel(
     if (cached) return { ...cached, fromCache: true };
   }
   const res = await fetch(`/api/emissions?ticker=${encodeURIComponent(ticker)}&model=${encodeURIComponent(modelKey)}`);
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) {
+    // Backend returned HTML (e.g. a static host's 404 / server not running server.js).
+    throw new Error(
+      "API 伺服器沒有回傳 JSON。網站可能部署在「靜態主機」(如 GitHub Pages)，無法執行 server.js。請改用可執行 Node 的主機 (Render / Railway / Fly.io)，或在伺服器上確認 server.js 正在運行且環境變數已設定。"
+    );
+  }
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error || "查詢失敗");
   setCache(parsed.symbol, parsed.market, data, modelKey);
@@ -735,6 +742,8 @@ async function initModelSwitch() {
   const stored = localStorage.getItem(MODEL_KEY);
   try {
     const r = await fetch("/api/health");
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) throw new Error("no-backend");
     const h = await r.json();
     if (h.models && h.models.length) {
       sel.innerHTML = h.models
