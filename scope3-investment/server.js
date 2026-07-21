@@ -32,16 +32,6 @@ const MODELS = {
     extra: {},
     maxTokens: 8192,
   },
-  groq: {
-    label: "Groq Llama 3.1 8B Instant",
-    id: "llama-3.1-8b-instant",
-    baseURL: "https://api.groq.com/openai/v1",
-    apiKey:
-      "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",
-    topP: 1,
-    extra: {},
-    maxTokens: 4096,
-  },
 };
 const DEFAULT_MODEL = "minimax";
 const RETRIES = 1;

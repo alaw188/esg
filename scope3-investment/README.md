@@ -1,6 +1,6 @@
 # 範圍三碳排放計算平台
 
-計算 **GHG Protocol 範圍三第 15 分類（投資）** 碳排放，支援任意香港及美國上市公司。排放數據由 AI 模型（預設 **NVIDIA MiniMax M3**，可切換至 **Groq Llama 3.1 8B Instant**）根據其訓練知識，從公司公開可持續發展報告估算。
+計算 **GHG Protocol 範圍三第 15 分類（投資）** 碳排放，支援任意香港及美國上市公司。排放數據由 AI 模型（**NVIDIA MiniMax M3**）根據其訓練知識，從公司公開可持續發展報告估算。
 
 ## 架構
 
@@ -13,7 +13,7 @@
 | **A — Cloudflare Pages（推薦）** | Cloudflare（免費） | 註冊 Cloudflare 帳號 | 簡單 |
 | **B — Node 伺服器** | Render / Railway（免費） | 註冊 Render 帳號 | 簡單 |
 
-> **為什麼 GitHub Pages 不夠？** NVIDIA、Groq 的 API **沒有 CORS 標頭**，瀏覽器會擋下呼叫。必須有伺服器端轉發請求。Cloudflare Pages 內建伺服器函數，可以從同一個域名提供 API，沒有 CORS 問題。
+> **為什麼 GitHub Pages 不夠？** NVIDIA 的 API **沒有 CORS 標頭**，瀏覽器會擋下呼叫。必須有伺服器端轉發請求。Cloudflare Pages 內建伺服器函數，可以從同一個域名提供 API，沒有 CORS 問題。
 
 ---
 
@@ -73,18 +73,16 @@ Cloudflare Pages 會自動：
 ## 功能
 
 - 輸入**任意**美國（`AAPL`）或香港（`0012`、`0700.HK`）股票代號
-- AI 自動辨識公司並估算其最新範圍一、二排放（預設 NVIDIA MiniMax M3，可在「AI 模型」下拉選單切換至 Groq）
+- AI 自動辨識公司並估算其最新範圍一、二排放（NVIDIA MiniMax M3）
 - 投資組合表格：新增、修改持股、重新查詢、移除
 - **手動輸入後備**：若 AI 未能辨識某股票，可直接手動填入排放數據繼續計算
 - 按 PCAF 標準計算範圍三融資排放
 - 點擊「**匯出 PDF 報告**」產生供審計追溯的完整報告
 - 快取 24 小時，減少 API 調用
 
-## 切換 AI 模型
+## AI 模型
 
-工具列的「AI 模型」下拉選單可切換：
-- **NVIDIA MiniMax M3**（預設）— 約 10–30 秒
-- **Groq Llama 3.1 8B Instant** — 較快，但目前 Groq 金鑰待更新
+使用 **NVIDIA MiniMax M3**（`minimaxai/minimax-m3`）。
 
 ## 免責
 
@@ -93,16 +91,14 @@ Cloudflare Pages 會自動：
 ## API
 
 ```
-GET /api/health                              # 檢查可用模型
-GET /api/emissions?ticker=AAPL               # 查詢（預設模型 minimax）
+GET /api/health                              # 檢查 API 狀態
+GET /api/emissions?ticker=AAPL               # 查詢（NVIDIA MiniMax M3）
 GET /api/emissions?ticker=0012               # 香港代號
-GET /api/emissions?ticker=AAPL&model=groq    # 指定模型
-GET /api/emissions?ticker=AAPL&model=minimax
 ```
 
 ## 安全提示
 
-API 金鑰寫在 `functions/_lib.js` 和 `server.js` 中並提交進 Git（依專案需求）。若倉庫公開，金鑰等同公開。建議改用 Cloudflare Pages 的 **環境變數**（Settings → Environment Variables → add `NVIDIA_API_KEY`、`GROQ_API_KEY`），並將程式碼中的 `apiKey` 改為讀取 `env.NVIDIA_API_KEY` / `env.GROQ_API_KEY`。
+API 金鑰寫在 `functions/_lib.js` 和 `server.js` 中並提交進 Git（依專案需求）。若倉庫公開，金鑰等同公開。建議改用 Cloudflare Pages 的 **環境變數**（Settings → Environment Variables → add `NVIDIA_API_KEY`），並將程式碼中的 `apiKey` 改為讀取 `env.NVIDIA_API_KEY`。
 
 ## 開發：本機測試
 
