@@ -1,8 +1,22 @@
-require("dotenv").config();
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const OpenAI = require("openai");
+
+// --- Minimal .env loader (no `dotenv` dependency) ---------------------------
+// Reads .env if present, but never overrides variables already in the
+// environment (so cloud-platform env vars take precedence). This keeps the app
+// dependency-free: `node server.js` is all you need after upload.
+(function loadEnv() {
+  try {
+    const txt = fs.readFileSync(path.join(__dirname, ".env"), "utf8");
+    for (const line of txt.split("\n")) {
+      const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)\s*$/);
+      if (m && process.env[m[1]] === undefined) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      }
+    }
+  } catch {}
+})();
 
 const PORT = process.env.PORT || 8080;
 const RETRIES = parseInt(process.env.API_RETRIES || "1", 10); // extra attempts on failure
@@ -50,18 +64,6 @@ const MODELS = {
   },
 };
 const DEFAULT_MODEL = MODELS[process.env.NVIDIA_MODEL] ? process.env.NVIDIA_MODEL : "nemotron";
-
-// One OpenAI-compatible client per model key (keys differ between models).
-const clients = {};
-function getClient(modelKey) {
-  if (!clients[modelKey]) {
-    clients[modelKey] = new OpenAI({
-      apiKey: MODELS[modelKey].apiKey,
-      baseURL: "https://integrate.api.nvidia.com/v1",
-    });
-  }
-  return clients[modelKey];
-}
 
 /**
  * Disambiguation hints ONLY.
@@ -240,9 +242,8 @@ function normalizeAndValidate(raw, parsed) {
 
 async function queryModel(parsed, attempt, modelKey) {
   const m = MODELS[modelKey];
-  const client = getClient(modelKey);
 
-  const stream = await client.chat.completions.create({
+  const payload = {
     model: m.id,
     messages: [{ role: "user", content: buildPrompt(parsed, attempt) }],
     temperature: 1,
@@ -250,15 +251,27 @@ async function queryModel(parsed, attempt, modelKey) {
     max_tokens: m.maxTokens || Number(process.env.API_MAX_TOKENS || 16384),
     // Per-model extras: nemotron -> reasoning_budget; gemma -> chat_template_kwargs.
     ...m.extra,
-    stream: true,
+    stream: false,
+  };
+
+  // Direct call to the NVIDIA NIM OpenAI-compatible endpoint using Node's
+  // built-in fetch — no `openai` SDK required.
+  const resp = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + m.apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 
-  // Accumulate streamed deltas (mirrors the OpenAI streaming consumption pattern).
-  let content = "";
-  for await (const chunk of stream) {
-    const piece = chunk.choices?.[0]?.delta?.content;
-    if (piece) content += piece;
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error("NVIDIA API HTTP " + resp.status + " " + body.slice(0, 200));
   }
+
+  const data = await resp.json();
+  const content = data?.choices?.[0]?.message?.content || "";
   if (!content) throw new Error("NVIDIA API 回傳空白內容");
 
   let raw;
@@ -368,8 +381,8 @@ const server = http.createServer(async (req, res) => {
   res.end("Not found");
 });
 
-server.listen(PORT, () => {
-  console.log(`Scope 3 Calculator running at http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Scope 3 Calculator running at http://0.0.0.0:${PORT}`);
   console.log(`Default model: ${DEFAULT_MODEL} (${MODELS[DEFAULT_MODEL].id}) — ${Object.keys(MODELS).length} model(s) registered`);
   if (!MODELS[DEFAULT_MODEL].apiKey) console.warn("WARNING: default model API key not set — emissions lookup will fail");
 });

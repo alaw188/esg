@@ -6,9 +6,5 @@
   "scripts": {
     "serve": "node server.js",
     "start": "node server.js"
-  },
-  "dependencies": {
-    "dotenv": "^17.4.2",
-    "openai": "^6.48.0"
   }
 }
